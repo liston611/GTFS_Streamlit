@@ -3,6 +3,7 @@ from google.transit import gtfs_realtime_pb2
 import requests
 import pandas as pd
 import time
+import pydeck as pdk
 
 def parse_gtfs_rt_data(data):
     feed = gtfs_realtime_pb2.FeedMessage()
@@ -24,21 +25,33 @@ url = 'https://gtfs-rt.itsmarta.com/TMGTFSRealTimeWebService/vehicle/vehicleposi
 
 if url:
     st.subheader('Vehicle Positions on Map')
-    map_placeholder = st.empty()
-    # Fetch GTFS-RT data from URL
+
+    # Use st.pydeck_chart() to create the initial map
+    empty_map = st.pydeck_chart()
+
     while True:
         response = requests.get(url)
         if response.status_code == 200:
             gtfs_rt_feed = parse_gtfs_rt_data(response.content)
-            # Get vehicle positions
             vehicle_positions = get_vehicle_positions(gtfs_rt_feed)
-            
-            # Create DataFrame with 'LAT' and 'LON' columns
             df = pd.DataFrame(vehicle_positions, columns=['LAT', 'LON'])
-            
-            # Display vehicle positions on map
-            map_placeholder.map(df)
+
+            # Use Pydeck to create a new map layer with updated data
+            new_layer = pdk.Layer(
+                'ScatterplotLayer',
+                data=df,
+                get_position='[LON, LAT]',
+                get_radius=100,
+                get_fill_color=[255, 0, 0],
+                pickable=True,
+                auto_highlight=True,
+            )
+
+            # Update the map by replacing the initial empty map with the new layer
+            empty_map.pydeck_chart(pdk.Deck(layers=[new_layer]))
         else:
             st.error("Failed to fetch GTFS-RT data. Please check the URL.")
+            break
 
-#        time.sleep(1)
+        # Wait for 1 second before updating again
+        time.sleep(1)
